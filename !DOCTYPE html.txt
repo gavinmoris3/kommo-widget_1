@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>New Leads Per Advisor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h2 {
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+  </style>
+</head>
+<body>
+  <h2>📈 New Leads Per Advisor (Today)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Advisor</th>
+        <th>New Leads</th>
+      </tr>
+    </thead>
+    <tbody id="leads-table">
+      <tr><td colspan="2">Loading...</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    const API_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6IjFiNDRhN2RiYmY3OGVhODFlNDA0NDk3Zjc1MzJjZmJmNzZlMDg5ZWY0NDcyMjc1YjJlMmFjYjVjNWI0YWRmODY0MjkwN2RiNWFlOTlhNzA0In0.eyJhdWQiOiI4NDc0NTk3NC1hNzJlLTQ4MzgtYTg1NC04MWJhMzJmYzYxNjAiLCJqdGkiOiIxYjQ0YTdkYmJmNzhlYTgxZTQwNDQ5N2Y3NTMyY2ZiZjc2ZTA4OWVmNDQ3MjI3NWIyZTJhY2I1YzViNGFkZjg2NDI5MDdkYjVhZTk5YTcwNCIsImlhdCI6MTc1Mzg2NDkyNCwibmJmIjoxNzUzODY0OTI0LCJleHAiOjE5MDY4NDgwMDAsInN1YiI6IjEyODg3MjUxIiwiZ3JhbnRfdHlwZSI6IiIsImFjY291bnRfaWQiOjM0MzE2MjM5LCJiYXNlX2RvbWFpbiI6ImtvbW1vLmNvbSIsInZlcnNpb24iOjIsInNjb3BlcyI6WyJjcm0iLCJmaWxlcyIsImZpbGVzX2RlbGV0ZSIsIm5vdGlmaWNhdGlvbnMiLCJwdXNoX25vdGlmaWNhdGlvbnMiXSwiaGFzaF91dWlkIjoiNTI5Mzk3YTgtYWUwYi00NjYyLWIxYTktNjY4NDk0OTMwZTExIiwiYXBpX2RvbWFpbiI6ImFwaS1jLmtvbW1vLmNvbSJ9.R2dRbvy3ETnHm0TWrb5nsC8vloUuKCEd1Xba4sQ1UwLRk-WrpE88_6dafOKVOneG8BG3ioLn8VmcbZr9cM3BOp2mqgtmdYzErWttf4WTEGDkD6akzW_YxATBjnolssLY7UQaAuQIYMP6v9d2LSAlrfpOkKwjQxQBMfJf-MhgnRgwOvdwPDYBb7YjO9pSr-c1TfFSZpyrpDdKAEsuoHttOglQRS2q5tiVBpbACPec26ztD81lziibhMGT6--h0B1NCP6jBxa1J-FYQbOL0CBT5SDylCcoWABVrYeNx4yF2d3XuKAxm59lcSrmkdrf75nlCKGNaP93XIqF1AMXAdkK5A';
+    const SUBDOMAIN = 'mestradawincompe'; // e.g. if your domain is youraccount.kommo.com
+
+    async function fetchLeads() {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+      const response = await fetch(`https://${SUBDOMAIN}.kommo.com/api/v4/leads?filter[created_at][from]=${today}T00:00:00Z&order=created_at`, {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      return data._embedded.leads;
+    }
+
+    function groupByAdvisor(leads) {
+      const result = {};
+      leads.forEach(lead => {
+        const advisorId = lead.responsible_user_id;
+        if (!result[advisorId]) result[advisorId] = 0;
+        result[advisorId]++;
+      });
+      return result;
+    }
+
+    async function fetchUserNames() {
+      const res = await fetch(`https://${SUBDOMAIN}.kommo.com/api/v4/users`, {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      const data = await res.json();
+      const users = {};
+      data._embedded.users.forEach(u => {
+        users[u.id] = u.name;
+      });
+      return users;
+    }
+
+    async function renderTable() {
+      try {
+        const leads = await fetchLeads();
+        const userMap = await fetchUserNames();
+        const grouped = groupByAdvisor(leads);
+
+        const tbody = document.getElementById('leads-table');
+        tbody.innerHTML = '';
+
+        Object.keys(grouped).forEach(advisorId => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${userMap[advisorId] || 'Unknown'}</td>
+            <td>${grouped[advisorId]}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        if (Object.keys(grouped).length === 0) {
+          tbody.innerHTML = '<tr><td colspan="2">No new leads today.</td></tr>';
+        }
+      } catch (e) {
+        document.getElementById('leads-table').innerHTML = '<tr><td colspan="2">Error loading data.</td></tr>';
+        console.error('Error loading widget:', e);
+      }
+    }
+
+    renderTable();
+  </script>
+</body>
+</html>
